@@ -20,7 +20,22 @@ npm run build
 
 ## Usage
 
-### As MCP Server
+### As MCP Server (Web App)
+
+Add to your MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "consolidation-engine": {
+      "command": "node",
+      "args": ["/path/to/consolidation-engine/dist/index.js"]
+    }
+  }
+}
+```
+
+Then start the server:
 
 ```bash
 npm start
@@ -85,7 +100,7 @@ npm run test:coverage    # With coverage report
 ```
 ┌─────────────────────────────────────────────────┐
 │                  MCP stdio                       │
-│              (Claude Desktop)                    │
+│                (Web App)                         │
 ├─────────────────────────────────────────────────┤
 │              InterLock UDP Mesh                  │
 │                (Port 3032)                       │
