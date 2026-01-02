@@ -133,7 +133,7 @@ describe('SignalHandlers', () => {
       handlers.setDefault(errorHandler);
 
       expect(() => {
-        handlers.route(createMessage(SIGNAL_TYPES.UNKNOWN), createRinfo());
+        handlers.route(createMessage(0xFF), createRinfo()); // Unknown signal type
       }).not.toThrow();
     });
   });

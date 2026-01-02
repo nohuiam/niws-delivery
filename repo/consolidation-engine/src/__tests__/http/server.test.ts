@@ -22,7 +22,7 @@ describe('HttpServer', () => {
   describe('Health Endpoint', () => {
     it('should return healthy status', async () => {
       const response = await fetch(`${baseUrl}/health`);
-      const data = await response.json();
+      const data = await response.json() as Record<string, unknown>;
 
       expect(response.status).toBe(200);
       expect(data.status).toBe('healthy');
@@ -35,7 +35,7 @@ describe('HttpServer', () => {
   describe('Plan Endpoints', () => {
     it('GET /api/plans should return list', async () => {
       const response = await fetch(`${baseUrl}/api/plans`);
-      const data = await response.json();
+      const data = await response.json() as Record<string, unknown>;
 
       expect(response.status).toBe(200);
       expect(data.plans).toBeDefined();
@@ -96,7 +96,7 @@ describe('HttpServer', () => {
   describe('Conflict Endpoints', () => {
     it('GET /api/conflicts should return list', async () => {
       const response = await fetch(`${baseUrl}/api/conflicts`);
-      const data = await response.json();
+      const data = await response.json() as Record<string, unknown>;
 
       expect(response.status).toBe(200);
       expect(data.conflicts).toBeDefined();
@@ -122,7 +122,7 @@ describe('HttpServer', () => {
   describe('History Endpoint', () => {
     it('GET /api/history should return operations', async () => {
       const response = await fetch(`${baseUrl}/api/history`);
-      const data = await response.json();
+      const data = await response.json() as Record<string, unknown>;
 
       expect(response.status).toBe(200);
       expect(data.operations).toBeDefined();
@@ -143,7 +143,7 @@ describe('HttpServer', () => {
   describe('Stats Endpoint', () => {
     it('GET /api/stats should return statistics', async () => {
       const response = await fetch(`${baseUrl}/api/stats`);
-      const data = await response.json();
+      const data = await response.json() as Record<string, unknown>;
 
       expect(response.status).toBe(200);
       expect(data.database).toBeDefined();
