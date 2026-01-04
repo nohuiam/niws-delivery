@@ -58,6 +58,7 @@
     { "name": "health-monitor", "host": "localhost", "port": 3024 },
     { "name": "synapse-relay", "host": "localhost", "port": 3025 },
     { "name": "filesystem-guardian", "host": "localhost", "port": 3026 },
+    { "name": "tenets-server", "host": "localhost", "port": 3027 },
     { "name": "consolidation-engine", "host": "localhost", "port": 3032 }
   ],
   "database": {
