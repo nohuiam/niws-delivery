@@ -5,14 +5,20 @@
  */
 
 export const SIGNAL_TYPES = {
-  // Core signals
-  HEARTBEAT: 0x01,
-  DISCOVERY: 0x02,
-  SHUTDOWN: 0x03,
+  // Core signals (ecosystem aligned)
+  DOCK_REQUEST: 0x01,
+  DOCK_APPROVE: 0x02,
+  DOCK_REJECT: 0x03,
+  HEARTBEAT: 0x04,
+  DISCONNECT: 0x05,
 
-  // Health signals
-  HEALTH_CHECK: 0x04,
-  HEALTH_RESPONSE: 0x05,
+  // Legacy aliases for compatibility
+  DISCOVERY: 0x01,  // Alias for DOCK_REQUEST
+  SHUTDOWN: 0x05,   // Alias for DISCONNECT
+
+  // Health signals (moved to avoid conflicts)
+  HEALTH_CHECK: 0x06,
+  HEALTH_RESPONSE: 0x07,
 
   // Merge signals
   MERGE_PLAN_CREATED: 0x30,
@@ -72,20 +78,72 @@ export function encode(message: {
 }
 
 /**
- * Decode a Buffer to message object
+ * Decode binary BaNano format (12-byte header + JSON)
  */
-export function decode(buffer: Buffer): DecodedMessage | null {
+function decodeBinary(buffer: Buffer): DecodedMessage | null {
+  if (buffer.length < 12) return null;
+
   try {
-    const str = buffer.toString('utf-8');
-    const payload = JSON.parse(str);
+    const signalType = buffer.readUInt16BE(0);
+    const payloadLength = buffer.readUInt32BE(4);
+    const timestamp = buffer.readUInt32BE(8);
+
+    if (signalType === 0 || signalType > 0xFF) return null;
+    if (payloadLength > buffer.length - 12) return null;
+
+    const payloadStr = buffer.slice(12, 12 + payloadLength).toString('utf8');
+    const payload = JSON.parse(payloadStr);
 
     return {
-      type: payload.t,
-      serverId: payload.s,
-      data: payload.d,
-      timestamp: payload.ts
+      type: signalType,
+      serverId: payload.sender || payload.serverId || 'unknown',
+      data: payload,
+      timestamp: timestamp * 1000
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * Decode text format {t, s, d, ts}
+ */
+function decodeText(buffer: Buffer): DecodedMessage | null {
+  try {
+    const str = buffer.toString('utf-8');
+    if (!str.startsWith('{')) return null;
+
+    const payload = JSON.parse(str);
+
+    if ('t' in payload && 's' in payload) {
+      return {
+        type: payload.t,
+        serverId: payload.s,
+        data: payload.d,
+        timestamp: payload.ts
+      };
+    }
+
+    if ('type' in payload && 'source' in payload) {
+      return {
+        type: typeof payload.type === 'number' ? payload.type : 0,
+        serverId: payload.source,
+        data: payload.payload,
+        timestamp: payload.timestamp
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decode a Buffer to message object
+ */
+export function decode(buffer: Buffer): DecodedMessage | null {
+  const binaryResult = decodeBinary(buffer);
+  if (binaryResult) return binaryResult;
+  return decodeText(buffer);
 }

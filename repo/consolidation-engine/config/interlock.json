@@ -15,6 +15,7 @@
     "bonzai-bloat-buster": { "host": "localhost", "port": 3008 },
     "pk-manager": { "host": "localhost", "port": 3018 },
     "knowledge-curator": { "host": "localhost", "port": 3017 },
-    "snapshot": { "host": "localhost", "port": 3003 }
+    "snapshot": { "host": "localhost", "port": 3003 },
+    "consciousness-mcp": { "host": "localhost", "port": 3028 }
   }
 }
