@@ -1,15 +1,26 @@
-import type { Signal } from '../types.js';
-
 /**
- * BaNano Protocol - 12-byte header + JSON payload
+ * InterLock Protocol - Official BaNano Binary Format
  *
- * Header:
- * ┌─────────┬─────────┬─────────┬─────────────┬─────────────┐
- * │  Type   │ Ver Maj │ Ver Min │ Payload Len │  Timestamp  │
- * │ 1 byte  │ 1 byte  │ 1 byte  │   4 bytes   │   4 bytes   │
- * └─────────┴─────────┴─────────┴─────────────┴─────────────┘
- * + JSON payload (UTF-8)
+ * 12-byte header:
+ * Bytes 0-1:   Signal Type (uint16, big-endian)
+ * Bytes 2-3:   Protocol Version (uint16, big-endian)
+ * Bytes 4-7:   Payload Length (uint32, big-endian)
+ * Bytes 8-11:  Timestamp (uint32, Unix seconds)
+ * Bytes 12+:   Payload (JSON, UTF-8)
  */
+
+// Protocol version 1.0
+const PROTOCOL_VERSION = 0x0100;
+
+export interface Signal {
+  signalType: number;
+  version: number;
+  timestamp: number;
+  payload: {
+    sender: string;
+    [key: string]: unknown;
+  };
+}
 
 export const SignalTypes = {
   // Core signals
@@ -102,93 +113,218 @@ export const SignalTypes = {
 
 export type SignalTypeName = keyof typeof SignalTypes;
 
-export function getSignalName(type: number): string {
-  for (const [name, value] of Object.entries(SignalTypes)) {
-    if (value === type) return name;
-  }
-  return `UNKNOWN_0x${type.toString(16).padStart(2, '0')}`;
+// Signal name mappings
+const SIGNAL_NAMES: Record<number, string> = Object.fromEntries(
+  Object.entries(SignalTypes).map(([name, value]) => [value, name])
+);
+
+/**
+ * Get signal name from type code
+ */
+export function getSignalName(signalType: number): string {
+  return SIGNAL_NAMES[signalType] || `UNKNOWN_0x${signalType.toString(16).toUpperCase()}`;
 }
 
+/**
+ * Encode a signal to BaNano binary format
+ */
+export function encode(signalType: number, sender: string, data?: Record<string, unknown>): Buffer {
+  const payload = JSON.stringify({ sender, ...data });
+  const payloadBuffer = Buffer.from(payload, 'utf8');
+
+  const header = Buffer.alloc(12);
+  header.writeUInt16BE(signalType, 0);
+  header.writeUInt16BE(PROTOCOL_VERSION, 2);
+  header.writeUInt32BE(payloadBuffer.length, 4);
+  header.writeUInt32BE(Math.floor(Date.now() / 1000), 8);
+
+  return Buffer.concat([header, payloadBuffer]);
+}
+
+/**
+ * Map string signal type to numeric code
+ */
+function mapStringToSignalType(typeStr: string): number {
+  const mapping: Record<string, number> = {
+    // Core signals
+    'HEARTBEAT': 0x04,
+    'DOCK_REQUEST': 0x01,
+    'DOCK_APPROVED': 0x02,
+    'DOCK_REJECTED': 0x03,
+    'UNDOCK': 0x05,
+    'SHUTDOWN': 0xFF,
+    'ERROR': 0xF0,
+    // File signals
+    'FILE_DISCOVERED': 0x10,
+    'FILE_INDEXED': 0x11,
+    // Add more as needed
+  };
+  return mapping[typeStr.toUpperCase()] || 0x00;
+}
+
+/**
+ * Decode binary BaNano format (12-byte header + JSON)
+ */
+function decodeBinary(buffer: Buffer): Signal | null {
+  try {
+    const signalType = buffer.readUInt16BE(0);
+    const version = buffer.readUInt16BE(2);
+    const payloadLength = buffer.readUInt32BE(4);
+    const timestamp = buffer.readUInt32BE(8);
+
+    // Validate: signal type should be in valid range and payload length reasonable
+    if (signalType === 0 || signalType > 0xFF) {
+      return null;
+    }
+    if (payloadLength > buffer.length - 12) {
+      return null;
+    }
+
+    // Parse JSON payload
+    const payloadStr = buffer.slice(12, 12 + payloadLength).toString('utf8');
+    const payload = JSON.parse(payloadStr);
+
+    // Ensure payload has sender (servers may send serverId instead)
+    if (!payload.sender) {
+      payload.sender = payload.serverId || payload.source || 'unknown';
+    }
+
+    return {
+      signalType,
+      version,
+      timestamp,
+      payload,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decode text-based formats:
+ * - Format A: {t, s, d, ts} (consolidation-engine, intake-guardian, safe-batch-processor)
+ * - Format B: {type, source, payload, timestamp, nonce} (filesystem-guardian)
+ */
+function decodeText(buffer: Buffer): Signal | null {
+  try {
+    const str = buffer.toString('utf-8');
+
+    // Must start with { to be JSON
+    if (!str.startsWith('{')) {
+      return null;
+    }
+
+    const json = JSON.parse(str);
+
+    // Format A: {t, s, d, ts}
+    if ('t' in json && 's' in json) {
+      return {
+        signalType: typeof json.t === 'number' ? json.t : mapStringToSignalType(String(json.t)),
+        version: PROTOCOL_VERSION,
+        timestamp: Math.floor((json.ts || Date.now()) / 1000),
+        payload: {
+          sender: json.s,
+          ...(typeof json.d === 'object' && json.d !== null ? json.d : { data: json.d })
+        }
+      };
+    }
+
+    // Format B: {type, source, payload, timestamp, nonce}
+    if ('type' in json && 'source' in json) {
+      return {
+        signalType: typeof json.type === 'number' ? json.type : mapStringToSignalType(String(json.type)),
+        version: PROTOCOL_VERSION,
+        timestamp: Math.floor((json.timestamp || Date.now()) / 1000),
+        payload: {
+          sender: json.source,
+          ...(typeof json.payload === 'object' && json.payload !== null ? json.payload : {})
+        }
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decode a buffer to Signal - supports multiple formats
+ * Tries binary format first, falls back to text formats
+ * Returns null if buffer is invalid
+ */
+export function decode(buffer: Buffer): Signal | null {
+  if (!buffer || buffer.length < 2) {
+    return null;
+  }
+
+  // Try binary format first (12-byte header)
+  if (buffer.length >= 12) {
+    const binaryResult = decodeBinary(buffer);
+    if (binaryResult) return binaryResult;
+  }
+
+  // Fall back to text formats
+  const textResult = decodeText(buffer);
+  if (textResult) return textResult;
+
+  return null;
+}
+
+/**
+ * Check if a signal type is valid (known)
+ */
+export function isValidSignal(signalType: number): boolean {
+  return signalType in SIGNAL_NAMES;
+}
+
+/**
+ * Create a Signal object for emitting
+ */
+export function createSignal(
+  signalType: number,
+  sender: string,
+  data?: Record<string, unknown>
+): Signal {
+  return {
+    signalType,
+    version: PROTOCOL_VERSION,
+    timestamp: Math.floor(Date.now() / 1000),
+    payload: {
+      sender,
+      ...data,
+    },
+  };
+}
+
+// Legacy class wrapper for backwards compatibility during transition
 export class BaNanoProtocol {
   static readonly HEADER_SIZE = 12;
   static readonly VERSION_MAJOR = 1;
   static readonly VERSION_MINOR = 0;
 
-  /**
-   * Encode a signal into a buffer
-   */
   static encode(signal: Signal): Buffer {
-    const json = JSON.stringify(signal.data || {});
-    const payload = Buffer.from(json, 'utf8');
-    const header = Buffer.alloc(this.HEADER_SIZE);
-
-    header.writeUInt8(signal.type, 0);
-    header.writeUInt8(this.VERSION_MAJOR, 1);
-    header.writeUInt8(this.VERSION_MINOR, 2);
-    // Byte 3 is reserved
-    header.writeUInt32BE(payload.length, 4);
-    header.writeUInt32BE(Math.floor(Date.now() / 1000), 8);
-
-    return Buffer.concat([header, payload]);
+    const { sender, ...data } = signal.payload;
+    return encode(signal.signalType, sender, data);
   }
 
-  /**
-   * Decode a buffer into a signal
-   */
   static decode(buffer: Buffer): Signal {
-    if (buffer.length < this.HEADER_SIZE) {
-      throw new Error(`Buffer too small: ${buffer.length} < ${this.HEADER_SIZE}`);
+    if (!buffer || buffer.length < BaNanoProtocol.HEADER_SIZE) {
+      throw new Error('Buffer too small for BaNano header');
     }
-
-    const type = buffer.readUInt8(0);
-    const versionMajor = buffer.readUInt8(1);
-    const versionMinor = buffer.readUInt8(2);
     const payloadLength = buffer.readUInt32BE(4);
-    const timestamp = buffer.readUInt32BE(8);
-
-    if (buffer.length < this.HEADER_SIZE + payloadLength) {
-      throw new Error(`Incomplete payload: expected ${payloadLength}, got ${buffer.length - this.HEADER_SIZE}`);
+    if (buffer.length < BaNanoProtocol.HEADER_SIZE + payloadLength) {
+      throw new Error('Incomplete payload');
     }
-
-    const payloadBuffer = buffer.slice(this.HEADER_SIZE, this.HEADER_SIZE + payloadLength);
-    let data: Record<string, unknown> = {};
-
-    try {
-      const jsonStr = payloadBuffer.toString('utf8');
-      if (jsonStr.trim()) {
-        data = JSON.parse(jsonStr);
-      }
-    } catch {
-      // Empty or invalid JSON - use empty object
+    const result = decode(buffer);
+    if (!result) {
+      throw new Error('Invalid signal format');
     }
-
-    // Extract sender from data if present
-    const sender = (data.sender || data.serverId || data.server_id || 'unknown') as string;
-
-    return {
-      type,
-      version: `${versionMajor}.${versionMinor}`,
-      sender,
-      data,
-      timestamp: timestamp * 1000 // Convert to milliseconds
-    };
+    return result;
   }
 
-  /**
-   * Create a signal object
-   */
-  static createSignal(
-    type: number,
-    sender: string,
-    data: Record<string, unknown> = {}
-  ): Signal {
-    return {
-      type,
-      version: `${this.VERSION_MAJOR}.${this.VERSION_MINOR}`,
-      sender,
-      data: { ...data, sender },
-      timestamp: Date.now()
-    };
+  static createSignal(signalType: number, sender: string, data?: Record<string, unknown>): Signal {
+    return createSignal(signalType, sender, data);
   }
 }
 
