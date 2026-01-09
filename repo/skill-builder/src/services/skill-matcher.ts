@@ -16,6 +16,9 @@ export function matchSkills(
   skills: SkillMetadata[],
   minConfidence: number = SKILL_CONFIG.MIN_MATCH_CONFIDENCE
 ): SkillMatch[] {
+  // Clamp confidence to valid range [0, 1]
+  minConfidence = Math.max(0, Math.min(1, minConfidence));
+
   const matches: SkillMatch[] = [];
 
   const taskTokens = tokenize(taskDescription.toLowerCase());

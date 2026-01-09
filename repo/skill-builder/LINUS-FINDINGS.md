@@ -51,28 +51,28 @@ function detectSkillConflicts(
 - **Recommendation:** Consider embedding similarity or word boundary matching
 - **Status:** Deferred - requires more research
 
-## Minor Issues (Not Fixed)
+## Minor Issues
 
-### 1. No min_confidence Bounds Validation
+### 1. No min_confidence Bounds Validation (FIXED)
 - **Location:** `matchSkills()` function
 - **Issue:** Allows 0.0 confidence which returns all skills
-- **Recommendation:** Enforce minimum 0.1 confidence
+- **Fix:** Added `Math.max(0, Math.min(1, minConfidence))` clamping
 
-### 2. Token Counting Uses Heuristic
+### 2. Token Counting Uses Heuristic (Not Fixed)
 - **Location:** `src/services/token-counter.ts`
 - **Issue:** Estimates ~4 chars per token instead of using tiktoken
 - **Recommendation:** Integrate tiktoken for accurate counts
 
-### 3. Description Analysis Not Enforced
+### 3. Description Analysis Not Enforced (Not Fixed)
 - **Location:** `create_skill` tool
 - **Issue:** Can create vague skills without triggering analysis
 - **Recommendation:** Make description analysis mandatory
 
-### 4. No Input Sanitization on Skill Names
+### 4. No Input Sanitization on Skill Names (FIXED)
 - **Location:** `src/tools/create-skill.ts`
 - **Issue:** Skill names not validated/sanitized
 - **Risk:** Path traversal if names used in file paths
-- **Recommendation:** Add name validation regex
+- **Fix:** Added name validation with regex `/^[a-zA-Z0-9_-]+$/` and max 100 chars
 
 ## Pre-Existing Issues Fixed
 

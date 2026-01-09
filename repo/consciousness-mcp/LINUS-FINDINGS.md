@@ -41,23 +41,27 @@
 - **Risk:** Memory exhaustion, resource starvation
 - **Fix:** Added MAX_CLIENTS = 100 limit with 1013 status code rejection
 
-## Minor Issues (Not Fixed)
+## Minor Issues
 
-### 1. Pattern Frequency Unbounded
+### 1. Pattern Frequency Unbounded (Not Fixed)
 - **Location:** `src/database/schema.ts`
 - **Issue:** Pattern frequency is INTEGER with no practical limit
 - **Risk:** Integer overflow in centuries of operation
 - **Recommendation:** Monitor, no immediate action needed
 
-### 2. Hardcoded ECOSYSTEM_SERVERS List
-- **Location:** `src/tools/awareness.ts`
+### 2. Hardcoded ECOSYSTEM_SERVERS List (FIXED)
+- **Location:** `src/tools/identify-blind-spots.ts`
 - **Issue:** 26 servers hardcoded, could become stale
-- **Recommendation:** Move to config file or query dynamically
+- **Fix:** Added `getEcosystemServers()` function that dynamically gets servers from InterLock peers with fallback to static list
 
-### 3. No Peer Recovery Mechanism
-- **Location:** `src/interlock/`
+### 3. No Peer Recovery Mechanism (FIXED)
+- **Location:** `src/interlock/socket.ts`
 - **Issue:** Inactive peers not automatically recovered
-- **Recommendation:** Add exponential backoff reconnection logic
+- **Fix:** Added exponential backoff reconnection logic with:
+  - `startRecoveryChecker()`: 30-second interval recovery attempts
+  - `attemptPeerRecovery()`: Exponential backoff (10s, 20s, 40s, 80s, 160s)
+  - Max 5 recovery attempts per peer
+  - `peer_recovered` event when peer comes back online
 
 ## Test Results
 

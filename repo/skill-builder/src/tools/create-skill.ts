@@ -18,6 +18,14 @@ import {
 export function createSkill(input: CreateSkillInput): CreateSkillOutput {
   const db = getDatabase();
 
+  // Validate skill name (alphanumeric, hyphens, underscores only, max 100 chars)
+  const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+  if (!input.name || input.name.length > 100 || !NAME_PATTERN.test(input.name)) {
+    throw new Error(
+      'Invalid skill name. Must be 1-100 characters, alphanumeric with hyphens and underscores only.'
+    );
+  }
+
   // Check for conflicts with existing skills before creation
   const existingSkills = db.getAllSkills();
   const conflicts = detectSkillConflicts(
