@@ -7,10 +7,37 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import { Server } from 'http';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { getPlanManager } from '../core/plan-manager.js';
 import { getMergeEngine } from '../core/merge-engine.js';
 import { getConflictResolver } from '../core/conflict-resolver.js';
 import { getDatabase } from '../database/schema.js';
+
+// CORS whitelist - restrict to known origins for security
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',   // GMI frontend (Vite)
+  'http://127.0.0.1:5173',
+  'http://localhost:3099',   // GMI control API
+  'http://localhost:8032'    // Self
+];
+
+// Rate limiting configuration
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  limit: 100, // 100 requests per minute
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later', retryAfter: '60s' }
+});
+
+const mergeLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  limit: 20, // 20 merge operations per minute (conservative for file ops)
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many merge requests, please try again later', retryAfter: '60s' }
+});
 
 export class HttpServer {
   private app: express.Application;
@@ -27,17 +54,22 @@ export class HttpServer {
   private setupMiddleware(): void {
     this.app.use(express.json());
 
-    // CORS headers
-    this.app.use((req: Request, res: Response, next: NextFunction) => {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      if (req.method === 'OPTIONS') {
-        res.sendStatus(200);
-        return;
-      }
-      next();
-    });
+    // CORS - Restrict to known origins for security
+    this.app.use(cors({
+      origin: (origin, callback) => {
+        // Allow requests with no origin (same-origin, curl, etc.)
+        if (!origin) return callback(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) {
+          return callback(null, true);
+        }
+        callback(null, false);
+      },
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    }));
+
+    // Apply general rate limiting
+    this.app.use(generalLimiter);
   }
 
   private setupRoutes(): void {
@@ -107,8 +139,8 @@ export class HttpServer {
       }
     });
 
-    // Merge routes
-    this.app.post('/api/merge', async (req: Request, res: Response) => {
+    // Merge routes (stricter rate limit for file ops)
+    this.app.post('/api/merge', mergeLimiter, async (req: Request, res: Response) => {
       try {
         const mergeEngine = getMergeEngine();
         const result = await mergeEngine.merge(req.body);
@@ -174,6 +206,15 @@ export class HttpServer {
       } catch (error) {
         res.status(500).json({ error: (error as Error).message });
       }
+    });
+
+    // 404 handler
+    this.app.use((req: Request, res: Response) => {
+      res.status(404).json({
+        error: 'Not found',
+        path: req.path,
+        method: req.method
+      });
     });
   }
 
