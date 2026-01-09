@@ -13,9 +13,18 @@ import {
 describe('Protocol', () => {
   describe('SIGNAL_TYPES', () => {
     it('should define core signals', () => {
-      expect(SIGNAL_TYPES.HEARTBEAT).toBe(0x01);
-      expect(SIGNAL_TYPES.DISCOVERY).toBe(0x02);
-      expect(SIGNAL_TYPES.SHUTDOWN).toBe(0x03);
+      // Per INTERLOCK-PROTOCOL.barespec.md (2026-01-05 update)
+      expect(SIGNAL_TYPES.DOCK_REQUEST).toBe(0x01);
+      expect(SIGNAL_TYPES.DOCK_APPROVE).toBe(0x02);
+      expect(SIGNAL_TYPES.DOCK_REJECT).toBe(0x03);
+      expect(SIGNAL_TYPES.HEARTBEAT).toBe(0x04);
+      expect(SIGNAL_TYPES.DISCONNECT).toBe(0x05);
+    });
+
+    it('should define legacy aliases', () => {
+      // Legacy aliases for backwards compatibility
+      expect(SIGNAL_TYPES.DISCOVERY).toBe(SIGNAL_TYPES.DOCK_REQUEST); // 0x01
+      expect(SIGNAL_TYPES.SHUTDOWN).toBe(SIGNAL_TYPES.DISCONNECT);    // 0x05
     });
 
     it('should define merge signals', () => {
@@ -33,9 +42,16 @@ describe('Protocol', () => {
   describe('getSignalName', () => {
     it('should return name for known signal types', () => {
       expect(getSignalName(SIGNAL_TYPES.HEARTBEAT)).toBe('HEARTBEAT');
-      expect(getSignalName(SIGNAL_TYPES.DISCOVERY)).toBe('DISCOVERY');
+      expect(getSignalName(SIGNAL_TYPES.DOCK_REQUEST)).toBe('DOCK_REQUEST');
       expect(getSignalName(SIGNAL_TYPES.MERGE_COMPLETE)).toBe('MERGE_COMPLETE');
       expect(getSignalName(SIGNAL_TYPES.ERROR)).toBe('ERROR');
+    });
+
+    it('should return canonical name for aliased signals', () => {
+      // DISCOVERY (0x01) is alias for DOCK_REQUEST, returns first match in definition order
+      expect(getSignalName(SIGNAL_TYPES.DISCOVERY)).toBe('DOCK_REQUEST');
+      // SHUTDOWN (0x05) is alias for DISCONNECT
+      expect(getSignalName(SIGNAL_TYPES.SHUTDOWN)).toBe('DISCONNECT');
     });
 
     it('should return formatted unknown for unrecognized types', () => {

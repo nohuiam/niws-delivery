@@ -45,24 +45,26 @@ describe('Tumbler', () => {
     let tumbler: Tumbler;
 
     beforeEach(() => {
-      tumbler = new Tumbler(['0x01', '0x02']); // HEARTBEAT, DISCOVERY
+      // HEARTBEAT=0x04, DOCK_REQUEST/DISCOVERY=0x01 (per 2026-01-05 protocol)
+      tumbler = new Tumbler(['0x04', '0x01']);
     });
 
     it('should allow whitelisted signals', () => {
-      expect(tumbler.isAllowed(SIGNAL_TYPES.HEARTBEAT)).toBe(true);
-      expect(tumbler.isAllowed(SIGNAL_TYPES.DISCOVERY)).toBe(true);
+      expect(tumbler.isAllowed(SIGNAL_TYPES.HEARTBEAT)).toBe(true);     // 0x04
+      expect(tumbler.isAllowed(SIGNAL_TYPES.DISCOVERY)).toBe(true);     // 0x01 (alias)
+      expect(tumbler.isAllowed(SIGNAL_TYPES.DOCK_REQUEST)).toBe(true);  // 0x01 (canonical)
     });
 
     it('should block non-whitelisted signals', () => {
-      expect(tumbler.isAllowed(SIGNAL_TYPES.SHUTDOWN)).toBe(false);
-      expect(tumbler.isAllowed(SIGNAL_TYPES.MERGE_STARTED)).toBe(false);
-      expect(tumbler.isAllowed(SIGNAL_TYPES.ERROR)).toBe(false);
+      expect(tumbler.isAllowed(SIGNAL_TYPES.SHUTDOWN)).toBe(false);     // 0x05
+      expect(tumbler.isAllowed(SIGNAL_TYPES.MERGE_STARTED)).toBe(false); // 0x31
+      expect(tumbler.isAllowed(SIGNAL_TYPES.ERROR)).toBe(false);        // 0xE0
     });
 
     it('should increment allowed count for allowed signals', () => {
-      tumbler.isAllowed(SIGNAL_TYPES.HEARTBEAT);
-      tumbler.isAllowed(SIGNAL_TYPES.HEARTBEAT);
-      tumbler.isAllowed(SIGNAL_TYPES.DISCOVERY);
+      tumbler.isAllowed(SIGNAL_TYPES.HEARTBEAT);   // 0x04 - allowed
+      tumbler.isAllowed(SIGNAL_TYPES.HEARTBEAT);   // 0x04 - allowed
+      tumbler.isAllowed(SIGNAL_TYPES.DISCOVERY);   // 0x01 - allowed
 
       const stats = tumbler.getStats();
       expect(stats.allowed).toBe(3);
@@ -91,15 +93,16 @@ describe('Tumbler', () => {
 
   describe('getStats', () => {
     it('should return stats with hex-formatted type keys', () => {
-      const tumbler = new Tumbler(['0x01', '0x30']);
+      // HEARTBEAT=0x04, MERGE_PLAN_CREATED=0x30 (per 2026-01-05 protocol)
+      const tumbler = new Tumbler(['0x04', '0x30']);
 
-      tumbler.isAllowed(SIGNAL_TYPES.HEARTBEAT); // 0x01
+      tumbler.isAllowed(SIGNAL_TYPES.HEARTBEAT); // 0x04
       tumbler.isAllowed(SIGNAL_TYPES.HEARTBEAT);
       tumbler.isAllowed(SIGNAL_TYPES.MERGE_PLAN_CREATED); // 0x30
 
       const stats = tumbler.getStats();
 
-      expect(stats.byType['0x1']).toBe(2);
+      expect(stats.byType['0x4']).toBe(2);
       expect(stats.byType['0x30']).toBe(1);
     });
 

@@ -152,18 +152,31 @@ describe('HttpServer', () => {
   });
 
   describe('CORS', () => {
-    it('should return CORS headers', async () => {
-      const response = await fetch(`${baseUrl}/health`);
-
-      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
-    });
-
-    it('OPTIONS request should return 200', async () => {
-      const response = await fetch(`${baseUrl}/api/plans`, {
-        method: 'OPTIONS'
+    it('should return CORS headers for allowed origins', async () => {
+      // With origin whitelist, must send an allowed Origin header
+      const response = await fetch(`${baseUrl}/health`, {
+        headers: { 'Origin': 'http://localhost:5173' }
       });
 
-      expect(response.status).toBe(200);
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173');
+    });
+
+    it('should not return CORS headers for disallowed origins', async () => {
+      const response = await fetch(`${baseUrl}/health`, {
+        headers: { 'Origin': 'http://evil.com' }
+      });
+
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    });
+
+    it('OPTIONS preflight should return 204', async () => {
+      // cors package returns 204 for successful preflight (standard behavior)
+      const response = await fetch(`${baseUrl}/api/plans`, {
+        method: 'OPTIONS',
+        headers: { 'Origin': 'http://localhost:5173' }
+      });
+
+      expect(response.status).toBe(204);
     });
   });
 });
