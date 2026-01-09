@@ -1,0 +1,34 @@
+{
+  "server": {
+    "name": "niws-delivery",
+    "udpPort": 3036,
+    "httpPort": 8036,
+    "wsPort": 9036
+  },
+  "mesh": {
+    "peers": [
+      { "name": "niws-intake", "host": "localhost", "port": 3033 },
+      { "name": "niws-analysis", "host": "localhost", "port": 3034 },
+      { "name": "niws-production", "host": "localhost", "port": 3035 },
+      { "name": "context-guardian", "host": "localhost", "port": 3001 },
+      { "name": "consciousness-mcp", "host": "localhost", "port": 3028 }
+    ],
+    "signals": {
+      "emit": [
+        "server:ready",
+        "server:shutdown",
+        "export:started",
+        "export:completed",
+        "video:queued",
+        "video:processing",
+        "video:completed",
+        "workflow:started",
+        "workflow:step",
+        "workflow:completed",
+        "notion:pushed",
+        "notion:approved"
+      ],
+      "receive": ["*"]
+    }
+  }
+}
