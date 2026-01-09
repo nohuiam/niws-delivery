@@ -1,0 +1,31 @@
+{
+  "server": {
+    "name": "niws-analysis",
+    "udpPort": 3034,
+    "httpPort": 8034,
+    "wsPort": 9034
+  },
+  "mesh": {
+    "peers": [
+      { "name": "niws-intake", "host": "localhost", "port": 3033 },
+      { "name": "niws-production", "host": "localhost", "port": 3035 },
+      { "name": "niws-delivery", "host": "localhost", "port": 3036 }
+    ],
+    "signals": {
+      "emit": [
+        "server:ready",
+        "server:shutdown",
+        "analysis:started",
+        "analysis:complete",
+        "analysis:failed",
+        "comparison:started",
+        "comparison:complete"
+      ],
+      "receive": [
+        "article:new",
+        "story:clustered",
+        "analysis:request"
+      ]
+    }
+  }
+}
