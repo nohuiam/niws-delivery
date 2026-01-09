@@ -1,0 +1,37 @@
+{
+  "server": {
+    "name": "niws-production",
+    "udpPort": 3035,
+    "httpPort": 8035,
+    "wsPort": 9035
+  },
+  "mesh": {
+    "peers": [
+      { "name": "niws-intake", "host": "localhost", "port": 3033 },
+      { "name": "niws-analysis", "host": "localhost", "port": 3034 },
+      { "name": "niws-delivery", "host": "localhost", "port": 3036 },
+      { "name": "research-bus", "host": "localhost", "port": 3015 },
+      { "name": "tenets-server", "host": "localhost", "port": 3027 }
+    ],
+    "signals": {
+      "emit": [
+        "server:ready",
+        "server:shutdown",
+        "script:generated",
+        "script:validated",
+        "script:approved",
+        "brief:created",
+        "brief:rated",
+        "christohmeter:rated"
+      ],
+      "receive": [
+        "*"
+      ]
+    }
+  },
+  "protocol": {
+    "version": 1,
+    "headerSize": 12,
+    "format": "banano"
+  }
+}
