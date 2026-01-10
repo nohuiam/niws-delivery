@@ -152,8 +152,8 @@ export const intakeClient = {
    * Health check
    */
   async health(): Promise<{ healthy: boolean; url: string }> {
-    const { data, error } = await apiCall<{ status: string }>(INTAKE_URL, '/health', { timeout: 5000 });
-    return { healthy: !error && data?.status === 'ok', url: INTAKE_URL };
+    const { data, error } = await apiCall<{ status: string }>(INTAKE_URL, '/api/health', { timeout: 5000 });
+    return { healthy: !error && (data?.status === 'ok' || data?.status === 'healthy'), url: INTAKE_URL };
   },
 };
 
@@ -214,8 +214,8 @@ export const analysisClient = {
    * Health check
    */
   async health(): Promise<{ healthy: boolean; url: string }> {
-    const { data, error } = await apiCall<{ status: string }>(ANALYSIS_URL, '/health', { timeout: 5000 });
-    return { healthy: !error && data?.status === 'ok', url: ANALYSIS_URL };
+    const { data, error } = await apiCall<{ status: string }>(ANALYSIS_URL, '/api/health', { timeout: 5000 });
+    return { healthy: !error && (data?.status === 'ok' || data?.status === 'healthy' || data?.status === 'degraded'), url: ANALYSIS_URL };
   },
 };
 
@@ -268,8 +268,8 @@ export const researchClient = {
    * Health check
    */
   async health(): Promise<{ healthy: boolean; url: string }> {
-    const { data, error } = await apiCall<{ status: string }>(RESEARCH_URL, '/health', { timeout: 5000 });
-    return { healthy: !error && data?.status === 'ok', url: RESEARCH_URL };
+    const { data, error } = await apiCall<{ status: string }>(RESEARCH_URL, '/api/health', { timeout: 5000 });
+    return { healthy: !error && (data?.status === 'ok' || data?.status === 'healthy'), url: RESEARCH_URL };
   },
 };
 
@@ -335,8 +335,8 @@ export const tenetsClient = {
    * Health check
    */
   async health(): Promise<{ healthy: boolean; url: string }> {
-    const { data, error } = await apiCall<{ status: string }>(TENETS_URL, '/health', { timeout: 5000 });
-    return { healthy: !error && data?.status === 'ok', url: TENETS_URL };
+    const { data, error } = await apiCall<{ status: string }>(TENETS_URL, '/api/health', { timeout: 5000 });
+    return { healthy: !error && (data?.status === 'ok' || data?.status === 'healthy'), url: TENETS_URL };
   },
 };
 

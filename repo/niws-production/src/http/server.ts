@@ -46,7 +46,7 @@ export class HttpServer {
 
   private setupRoutes(): void {
     // Health & Status
-    this.addRoute('GET', /^\/health$/, this.handleHealth.bind(this));
+    this.addRoute('GET', /^\/api\/health$/, this.handleHealth.bind(this));
     this.addRoute('GET', /^\/api\/status$/, this.handleStatus.bind(this));
 
     // Scripts
