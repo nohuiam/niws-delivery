@@ -2,13 +2,28 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import http from 'http';
-import { teleprompterToolHandlers, exportTeleprompter, airdropToIpad } from '../tools/teleprompter-tools.js';
-import { notionToolHandlers, notionPushStory } from '../tools/notion-tools.js';
-import { videoToolHandlers, runVideoPipeline, getVideoStatus } from '../tools/video-tools.js';
-import { orchestratorToolHandlers, startOvernightRun, startMorningPoll, getWorkflowStatus, pauseWorkflow, resumeWorkflow, getSchedule, updateSchedule } from '../tools/orchestrator-tools.js';
+import { teleprompterToolHandlers, teleprompterToolDefinitions, exportTeleprompter, airdropToIpad } from '../tools/teleprompter-tools.js';
+import { notionToolHandlers, notionToolDefinitions, notionPushStory } from '../tools/notion-tools.js';
+import { videoToolHandlers, videoToolDefinitions, runVideoPipeline, getVideoStatus } from '../tools/video-tools.js';
+import { orchestratorToolHandlers, orchestratorToolDefinitions, startOvernightRun, startMorningPoll, getWorkflowStatus, pauseWorkflow, resumeWorkflow, getSchedule, updateSchedule } from '../tools/orchestrator-tools.js';
 import { productionClient } from '../services/clients.js';
 import { scheduler } from '../orchestrator/scheduler.js';
 import { getDatabase } from '../database/schema.js';
+
+// Combined tool definitions and handlers for gateway integration
+const allToolDefinitions = [
+  ...notionToolDefinitions,
+  ...teleprompterToolDefinitions,
+  ...videoToolDefinitions,
+  ...orchestratorToolDefinitions
+];
+
+const allToolHandlers: Record<string, (args: unknown) => Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }>> = {
+  ...notionToolHandlers,
+  ...teleprompterToolHandlers,
+  ...videoToolHandlers,
+  ...orchestratorToolHandlers
+};
 
 const app = express();
 
@@ -326,6 +341,40 @@ app.put('/api/workflow/schedule', asyncHandler(async (req: Request, res: Respons
   res.json({
     updated: true
   });
+}));
+
+// ===== GATEWAY INTEGRATION ENDPOINTS =====
+
+// GET /api/tools - List all MCP tools
+app.get('/api/tools', (_req: Request, res: Response) => {
+  const tools = allToolDefinitions.map(t => ({
+    name: t.name,
+    description: t.description,
+    inputSchema: t.inputSchema
+  }));
+  res.json({ tools, count: tools.length });
+});
+
+// POST /api/tools/:toolName - Execute MCP tool
+app.post('/api/tools/:toolName', asyncHandler(async (req: Request, res: Response) => {
+  const { toolName } = req.params;
+  const args = req.body.arguments || req.body;
+
+  const handler = allToolHandlers[toolName];
+  if (!handler) {
+    res.status(404).json({ success: false, error: `Tool '${toolName}' not found` });
+    return;
+  }
+
+  try {
+    const result = await handler(args);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
 }));
 
 // Error handling middleware
